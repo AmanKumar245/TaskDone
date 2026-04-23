@@ -17,7 +17,7 @@ const TaskCategories = () => {
     return (
         <div className="px-4 sm:px-6 lg:px-8 py-16 max-w-7xl mx-auto flex flex-col lg:flex-row gap-12 lg:gap-8 items-start">
 
-            {/* Left Column: Instructions */}
+            
             <div className="w-full lg:w-[40%] pr-0 lg:pr-8 py-8 lg:sticky lg:top-8">
                 <h2 className="text-4xl md:text-5xl lg:text-5xl font-black text-[#071343] leading-[1.05] tracking-tighter mb-6">
                     Post your first<br />task in seconds

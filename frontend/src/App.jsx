@@ -7,6 +7,10 @@ import PostTask from './pages/PostTask'
 import EarnMoney from './pages/EarnMoney'
 import Signup from './pages/Signup'
 import Login from './pages/Login'
+import BrowseTasks from './pages/BrowseTasks'
+import Discover from './pages/Discover'
+import MyTasks from './pages/MyTasks'
+import ManageTask from './pages/ManageTask'
 
 function App() {
   return (
@@ -26,6 +30,11 @@ function App() {
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/earn-money" element={<EarnMoney />} />
+                  <Route path="/tasks" element={<BrowseTasks />} />
+                  <Route path="/tasks/:taskId" element={<BrowseTasks />} />
+                  <Route path="/my-tasks" element={<MyTasks />} />
+                  <Route path="/my-tasks/:taskId" element={<ManageTask />} />
+                  <Route path="/discover" element={<Discover />} />
                 </Routes>
               </main>
               <Footer />

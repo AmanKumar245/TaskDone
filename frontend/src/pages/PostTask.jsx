@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 // Custom Date Picker component to perfectly match Airtasker's UI
 const CustomDatePicker = ({ selectedDate, onSelectDate, onClose }) => {
@@ -109,6 +109,9 @@ const CustomDatePicker = ({ selectedDate, onSelectDate, onClose }) => {
 const PostTask = () => {
     const [step, setStep] = useState(1);
     const [attemptedStep, setAttemptedStep] = useState(false);
+    const navigate = useNavigate();
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
     
     // Step 1: Title & Date
     const [title, setTitle] = useState('');
@@ -121,6 +124,45 @@ const PostTask = () => {
     // Step 2: Location
     const [locationType, setLocationType] = useState(''); // 'in_person', 'online'
     const [suburb, setSuburb] = useState('');
+    const [suggestions, setSuggestions] = useState([]);
+    const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+    const [locationError, setLocationError] = useState('');
+
+    useEffect(() => {
+        const fetchLocation = async () => {
+            setIsLoadingLocation(true);
+            setLocationError('');
+            try {
+                const response = await fetch(`https://api.postalpincode.in/pincode/${suburb}`);
+                const data = await response.json();
+                if (data && data[0] && data[0].Status === 'Success') {
+                    setSuggestions(data[0].PostOffice);
+                } else {
+                    setSuggestions([]);
+                    setLocationError('Invalid Pincode or details not found');
+                }
+            } catch (err) {
+                console.error("Location fetch error:", err);
+                setSuggestions([]);
+                setLocationError('Error fetching location data');
+            } finally {
+                setIsLoadingLocation(false);
+            }
+        };
+
+        if (/^\d{6}$/.test(suburb)) {
+            fetchLocation();
+        } else {
+            setSuggestions([]);
+            setLocationError('');
+        }
+    }, [suburb]);
+
+    const handleSelectSuggestion = (po) => {
+        const formattedLocation = `${po.Name}, ${po.District}, ${po.State} ${po.Pincode}`;
+        setSuburb(formattedLocation);
+        setSuggestions([]);
+    };
 
     // Step 3: Details
     const [details, setDetails] = useState('');
@@ -146,6 +188,62 @@ const PostTask = () => {
     const handleBack = () => {
         setAttemptedStep(false);
         if (step > 1) setStep(step - 1);
+    };
+
+    const handlePostTask = async () => {
+        if (!canGoNextStep4) {
+            setAttemptedStep(true);
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            if (!token) {
+                setError('You must be logged in to post a task.');
+                setIsLoading(false);
+                // Optionally redirect to login here
+                // navigate('/login');
+                return;
+            }
+
+            const taskData = {
+                title,
+                dateType,
+                selectedDate,
+                certainTime,
+                selectedTime,
+                locationType,
+                suburb,
+                details,
+                budget: Number(budget)
+            };
+
+            const response = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify(taskData)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Success - redirect to homepage or task detail
+                navigate('/');
+            } else {
+                setError(data.message || 'Failed to post task');
+            }
+        } catch (err) {
+            setError('Network error. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // Close calendar when clicking outside
@@ -417,27 +515,54 @@ const PostTask = () => {
                                         <label className="block text-[#071343] font-bold text-base mb-3">
                                             Where do you need this done?   
                                         </label>
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex items-center gap-1 bg-[#f3f6ff] px-3 py-4 rounded-xl cursor-not-allowed">
-                                                <span>🇦🇺</span>
-                                                <svg className="w-4 h-4 text-[#0047fb]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-                                            </div>
-                                            <div className="relative flex-1">
+                                        <div className="flex flex-col relative">
+                                            <div className="relative w-full">
                                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                                     <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                                 </div>
                                                 <input
                                                     type="text"
-                                                    placeholder="Enter a suburb"
+                                                    placeholder="Enter suburb or pincode"
                                                     className={`w-full bg-[#f3f6ff] border-2 ${attemptedStep && suburb.trim() === '' ? 'border-orange-500' : 'border-transparent focus:border-[#0047fb]'} rounded-xl pl-11 pr-4 py-4 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0047fb] transition text-base`}
                                                     value={suburb}
                                                     onChange={(e) => setSuburb(e.target.value)}
                                                 />
                                             </div>
+                                            {/* Suggestions Dropdown */}
+                                            {suggestions.length > 0 && (
+                                                <div className="absolute top-16 left-0 right-0 bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-gray-100 max-h-60 overflow-y-auto z-50">
+                                                    {suggestions.map((po, index) => (
+                                                        <div 
+                                                            key={index}
+                                                            onClick={() => handleSelectSuggestion(po)}
+                                                            className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 flex items-center gap-3 transition-colors"
+                                                        >
+                                                            <div className="w-8 h-8 rounded-full bg-[#f3f6ff] flex items-center justify-center flex-shrink-0">
+                                                                <svg className="h-4 w-4 text-[#0047fb]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-bold text-gray-900 text-[15px]">{po.Name}</div>
+                                                                <div className="text-sm text-gray-500">{po.District}, {po.State} {po.Pincode}</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                        {attemptedStep && suburb.trim() === '' && (
+                                        {isLoadingLocation && (
+                                            <p className="text-gray-500 font-medium text-sm mt-2 animate-fade-in flex items-center">
+                                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-[#0047fb]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                Fetching location details...
+                                            </p>
+                                        )}
+                                        {locationError && (
                                             <p className="text-orange-500 font-medium text-sm mt-2 animate-fade-in">
-                                                Please enter a suburb
+                                                {locationError}
+                                            </p>
+                                        )}
+                                        {attemptedStep && suburb.trim() === '' && !locationError && (
+                                            <p className="text-orange-500 font-medium text-sm mt-2 animate-fade-in">
+                                                Please enter a suburb or pincode
                                             </p>
                                         )}
                                     </div>
@@ -517,40 +642,48 @@ const PostTask = () => {
                         )}
 
                         {/* Next / Back Button Footer */}
-                        <div className="fixed bottom-0 left-0 right-0 md:static md:w-full bg-white p-4 md:p-0 border-t border-gray-200 md:border-none md:mt-12 flex justify-center gap-4">
-                            {step > 1 && (
-                                <button 
-                                    type="button" 
-                                    onClick={handleBack} 
-                                    className="flex-1 md:w-auto md:px-12 max-w-[200px] bg-[#f3f6ff] text-[#0047fb] py-4 rounded-full font-bold text-lg hover:bg-[#e4ebf8] transition"
-                                >
-                                    Back
-                                </button>
+                        <div className="fixed bottom-0 left-0 right-0 md:static md:w-full bg-white p-4 md:p-0 border-t border-gray-200 md:border-none md:mt-12 flex flex-col items-center">
+                            {error && (
+                                <div className="w-full max-w-lg mb-4 bg-red-50 text-red-600 p-3 rounded-lg text-sm font-medium text-center">
+                                    {error}
+                                </div>
                             )}
-                            
-                            {step < 4 ? (
-                                <button 
-                                    type="button" 
-                                    onClick={handleNext} 
-                                    className="flex-1 md:w-auto md:px-14 max-w-sm text-white py-4 rounded-full font-bold text-lg transition shadow-md bg-[#0047fb] hover:bg-blue-700"
-                                >
-                                    Next
-                                </button>
-                            ) : (
-                                <button 
-                                    type="button" 
-                                    className="flex-1 md:w-auto md:px-14 max-w-sm text-white py-4 rounded-full font-bold text-lg transition shadow-md bg-[#0047fb] hover:bg-blue-700"
-                                    onClick={() => {
-                                        if (!canGoNextStep4) {
-                                            setAttemptedStep(true);
-                                            return;
-                                        }
-                                        alert('Get quotes clicked! Form data ready to be sent.');
-                                    }}
-                                >
-                                    Get quotes
-                                </button>
-                            )}
+                            <div className="flex justify-center gap-4 w-full">
+                                {step > 1 && (
+                                    <button 
+                                        type="button" 
+                                        onClick={handleBack} 
+                                        disabled={isLoading}
+                                        className="flex-1 md:w-auto md:px-12 max-w-[200px] bg-[#f3f6ff] text-[#0047fb] py-4 rounded-full font-bold text-lg hover:bg-[#e4ebf8] transition disabled:opacity-50"
+                                    >
+                                        Back
+                                    </button>
+                                )}
+                                
+                                {step < 4 ? (
+                                    <button 
+                                        type="button" 
+                                        onClick={handleNext} 
+                                        className="flex-1 md:w-auto md:px-14 max-w-sm text-white py-4 rounded-full font-bold text-lg transition shadow-md bg-[#0047fb] hover:bg-blue-700"
+                                    >
+                                        Next
+                                    </button>
+                                ) : (
+                                    <button 
+                                        type="button" 
+                                        className="flex-1 md:w-auto md:px-14 max-w-sm text-white py-4 rounded-full font-bold text-lg transition shadow-md bg-[#0047fb] hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        onClick={handlePostTask}
+                                        disabled={isLoading}
+                                    >
+                                        {isLoading ? (
+                                            <>
+                                                <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                                Posting...
+                                            </>
+                                        ) : 'Get quotes'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                     </form>
