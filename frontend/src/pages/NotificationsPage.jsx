@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { useSocket } from '../context/SocketContext';
+import useSocket from '../context/useSocket';
 import { fetchNotifications, markAsRead, markAllAsRead, addNotification } from '../store/notificationSlice';
 import DashboardLayout from '../components/DashboardLayout';
 
@@ -11,6 +11,7 @@ const NotificationsPage = () => {
     const socket = useSocket();
 
     const { items: notifications, isLoading, unreadCount } = useSelector((state) => state.notifications);
+    const [currentTime] = useState(() => Date.now());
 
     // Fetch notifications via Redux thunk
     useEffect(() => {
@@ -113,7 +114,7 @@ const NotificationsPage = () => {
     };
 
     const timeAgo = (date) => {
-        const diff = Date.now() - new Date(date).getTime();
+        const diff = currentTime - new Date(date).getTime();
         const mins = Math.floor(diff / 60000);
         if (mins < 1) return 'Just now';
         if (mins < 60) return `${mins}m ago`;

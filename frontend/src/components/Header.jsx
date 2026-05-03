@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../store/authSlice';
 import { fetchUnreadCount, incrementUnread } from '../store/notificationSlice';
-import { useSocket } from '../context/SocketContext';
+import useSocket from '../context/useSocket';
 
 const Header = () => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);

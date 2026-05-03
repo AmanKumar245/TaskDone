@@ -1,7 +1,7 @@
 import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { SocketProvider } from './context/SocketContext'
+import { SocketProvider } from './context/SocketProvider'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import LandingPage from './pages/LandingPage'

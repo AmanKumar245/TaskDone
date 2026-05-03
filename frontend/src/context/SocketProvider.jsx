@@ -1,13 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
-
-
-const SocketContext = createContext(null);
-
-export const useSocket = () => useContext(SocketContext);
+import SocketContext from './SocketContext';
 
 export const SocketProvider = ({ children }) => {
-
     const [socket, setSocket] = useState(null);
 
     useEffect(() => {
@@ -26,6 +21,7 @@ export const SocketProvider = ({ children }) => {
             console.error('Socket connection error:', err.message);
         });
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSocket(newSocket);
 
         return () => {
@@ -39,5 +35,3 @@ export const SocketProvider = ({ children }) => {
         </SocketContext.Provider>
     );
 };
-
-export default SocketContext;

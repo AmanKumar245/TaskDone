@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { useSocket } from '../context/SocketContext';
+import useSocket from '../context/useSocket';
 import axiosInstance from '../api/axios';
 
 const Messages = () => {
