@@ -1,12 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { logout } from '../store/authSlice';
+import { fetchUnreadCount, incrementUnread } from '../store/notificationSlice';
+import { useSocket } from '../context/SocketContext';
 
 const Header = () => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
+    const dispatch = useDispatch();
+    const socket = useSocket();
 
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+    const { userInfo } = useSelector((state) => state.auth);
+    const { unreadCount } = useSelector((state) => state.notifications);
     const isLoggedIn = !!userInfo;
 
     useEffect(() => {
@@ -22,9 +29,25 @@ const Header = () => {
         };
     }, []);
 
+    // Fetch unread notification count from Redux
+    useEffect(() => {
+        if (isLoggedIn) {
+            dispatch(fetchUnreadCount());
+        }
+    }, [isLoggedIn, dispatch]);
+
+    // Listen for real-time notifications
+    useEffect(() => {
+        if (!socket) return;
+        const handleNewNotification = () => {
+            dispatch(incrementUnread());
+        };
+        socket.on('new_notification', handleNewNotification);
+        return () => socket.off('new_notification', handleNewNotification);
+    }, [socket, dispatch]);
+
     const handleLogout = () => {
-        localStorage.removeItem('userInfo');
-        localStorage.removeItem('token');
+        dispatch(logout());
         setIsDropdownOpen(false);
         navigate('/login');
     };
@@ -65,8 +88,19 @@ const Header = () => {
                         {isLoggedIn ? (
                             <>
                                 <a href="#" className="text-[#001D4A] hover:text-[#0047fb] text-sm font-medium">Help</a>
-                                <a href="#" className="text-[#001D4A] hover:text-[#0047fb] text-sm font-medium">Notifications</a>
-                                <a href="#" className="text-[#001D4A] hover:text-[#0047fb] text-sm font-medium">Messages</a>
+                                <Link to="/dashboard/notifications" className="text-[#001D4A] hover:text-[#0047fb] text-sm font-medium relative">
+                                    Notifications
+                                    {unreadCount > 0 && (
+                                        <span style={{
+                                            position: 'absolute', top: '-8px', right: '-14px',
+                                            background: '#ef4444', color: '#fff', fontSize: '10px',
+                                            fontWeight: '700', minWidth: '18px', height: '18px',
+                                            borderRadius: '9px', display: 'flex', alignItems: 'center',
+                                            justifyContent: 'center', padding: '0 4px',
+                                        }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+                                    )}
+                                </Link>
+                                <Link to="/messages" className="text-[#001D4A] hover:text-[#0047fb] text-sm font-medium">Messages</Link>
                                 
                                 {/* Avatar Dropdown */}
                                 <div className="relative" ref={dropdownRef}>
@@ -84,25 +118,29 @@ const Header = () => {
                                     {/* Dropdown Menu */}
                                     {isDropdownOpen && (
                                         <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50 animate-fade-in">
-                                            <div className="px-4 py-2 mb-2">
+                                            <Link 
+                                                to={`/profile/${userInfo._id}`} 
+                                                className="block px-4 py-2 mb-2 hover:bg-gray-50"
+                                                onClick={() => setIsDropdownOpen(false)}
+                                            >
                                                 <p className="text-sm font-bold text-[#001D4A]">{userInfo.firstName} {userInfo.lastName}</p>
-                                                <p className="text-xs text-gray-400 font-medium">Public Profile</p>
-                                            </div>
+                                                <p className="text-xs text-[#0047fb] font-medium">Public Profile</p>
+                                            </Link>
                                             
                                             <div className="border-b border-gray-100 mb-2"></div>
                                             
-                                            <a href="#" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50">My Tasker Dashboard</a>
-                                            <a href="#" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50">Payment history</a>
-                                            <a href="#" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50">Payment methods</a>
+                                            <Link to="/dashboard" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50" onClick={() => setIsDropdownOpen(false)}>My Tasker Dashboard</Link>
+                                            <Link to="/dashboard/payment-history" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50" onClick={() => setIsDropdownOpen(false)}>Payment history</Link>
+                                            <Link to="/dashboard/payment-methods" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50" onClick={() => setIsDropdownOpen(false)}>Payment methods</Link>
                                             
-                                            <a href="#" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50 flex justify-between items-center">
+                                            <Link to="/dashboard/settings/mobile" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50 flex justify-between items-center" onClick={() => setIsDropdownOpen(false)}>
                                                 Settings
                                                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                                            </a>
-                                            <a href="#" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50 flex justify-between items-center">
+                                            </Link>
+                                            <Link to="/discover" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50 flex justify-between items-center" onClick={() => setIsDropdownOpen(false)}>
                                                 Discover
                                                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                                            </a>
+                                            </Link>
                                             <a href="#" className="block px-4 py-2.5 text-sm text-[#001D4A] font-medium hover:bg-gray-50 flex justify-between items-center">
                                                 Help topics
                                                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>

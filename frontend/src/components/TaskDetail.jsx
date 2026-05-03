@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import axiosInstance from '../api/axios';
 
 const TaskDetail = ({ taskId }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('offers');
   const [task, setTask] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [markingComplete, setMarkingComplete] = useState(false);
 
   // Offer Modal State
   const [showOfferModal, setShowOfferModal] = useState(false);
@@ -30,14 +33,10 @@ const TaskDetail = ({ taskId }) => {
     setError(null);
     
     try {
-      const response = await fetch(`/api/tasks/${taskId}`);
-      if (!response.ok) {
-        throw new Error('Task not found');
-      }
-      const data = await response.json();
+      const { data } = await axiosInstance.get(`/tasks/${taskId}`);
       setTask(data);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || 'Task not found');
     } finally {
       setIsLoading(false);
     }
@@ -58,32 +57,18 @@ const TaskDetail = ({ taskId }) => {
     setOfferError('');
 
     try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/tasks/${taskId}/offers`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                price: Number(offerPrice),
-                message: offerMessage
-            })
+        await axiosInstance.post(`/tasks/${taskId}/offers`, {
+            price: Number(offerPrice),
+            message: offerMessage
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-            setShowOfferModal(false);
-            setOfferPrice('');
-            setOfferMessage('');
-            fetchTask(); // Refresh task data to show the new offer
-            setActiveTab('offers');
-        } else {
-            setOfferError(data.message || 'Failed to submit offer');
-        }
+        setShowOfferModal(false);
+        setOfferPrice('');
+        setOfferMessage('');
+        fetchTask();
+        setActiveTab('offers');
     } catch (err) {
-        setOfferError('Network error. Please try again.');
+        setOfferError(err.response?.data?.message || 'Network error. Please try again.');
     } finally {
         setOfferLoading(false);
     }
@@ -100,28 +85,14 @@ const TaskDetail = ({ taskId }) => {
     setQuestionError('');
 
     try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/tasks/${taskId}/questions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                message: questionMessage
-            })
+        await axiosInstance.post(`/tasks/${taskId}/questions`, {
+            message: questionMessage
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-            setQuestionMessage('');
-            fetchTask(); // Refresh task data to show the new question
-        } else {
-            setQuestionError(data.message || 'Failed to submit question');
-        }
+        setQuestionMessage('');
+        fetchTask();
     } catch (err) {
-        setQuestionError('Network error. Please try again.');
+        setQuestionError(err.response?.data?.message || 'Network error. Please try again.');
     } finally {
         setQuestionLoading(false);
     }
@@ -154,6 +125,26 @@ const TaskDetail = ({ taskId }) => {
   const dateObj = new Date(task.createdAt);
   const timeAgo = dateObj.toLocaleDateString();
 
+  // Check if current user is the assigned tasker
+  const isAssignedTasker = task.assignedTo && currentUserId === (task.assignedTo._id || task.assignedTo);
+  const isTaskOwner = currentUserId === task.user._id;
+
+  // Check if current user already has an offer
+  const existingOffer = task.offers?.find(o => o.user._id === currentUserId || o.user === currentUserId);
+
+  const handleMarkComplete = async () => {
+    if (!window.confirm('Mark this task as complete? The poster will review and release payment.')) return;
+    setMarkingComplete(true);
+    try {
+      await axiosInstance.patch(`/tasks/${taskId}/complete`);
+      fetchTask();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to mark task as complete');
+    } finally {
+      setMarkingComplete(false);
+    }
+  };
+
   return (
     <div className="bg-white min-h-full p-6 flex justify-center relative">
       <div className="max-w-5xl w-full flex flex-col lg:flex-row gap-8">
@@ -164,14 +155,58 @@ const TaskDetail = ({ taskId }) => {
           <div className="flex justify-between items-center mb-4">
             <div className="flex gap-2 text-xs font-bold">
               <span className={`px-3 py-1 rounded-full ${task.status === 'open' ? 'bg-green-200 text-green-800' : 'text-gray-400'}`}>OPEN</span>
-              <span className={`px-3 py-1 rounded-full ${task.status === 'assigned' ? 'bg-blue-200 text-blue-800' : 'text-gray-400'}`}>ASSIGNED</span>
-              <span className={`px-3 py-1 rounded-full ${task.status === 'completed' ? 'bg-gray-200 text-gray-800' : 'text-gray-400'}`}>COMPLETED</span>
+              <span className={`px-3 py-1 rounded-full ${task.status === 'assigned' || task.status === 'completed_pending' ? 'bg-blue-200 text-blue-800' : 'text-gray-400'}`}>ASSIGNED</span>
+              <span className={`px-3 py-1 rounded-full ${task.status === 'completed' ? 'bg-green-200 text-green-800' : task.status === 'completed_pending' ? 'bg-amber-200 text-amber-800' : 'text-gray-400'}`}>{task.status === 'completed_pending' ? 'REVIEW' : 'COMPLETED'}</span>
             </div>
             <button className="flex items-center text-blue-600 hover:bg-blue-50 px-3 py-1 rounded-full text-sm font-semibold transition-colors">
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
               Follow
             </button>
           </div>
+
+          {/* Assigned Tasker Banner */}
+          {isAssignedTasker && task.status === 'assigned' && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 mb-6">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <p className="text-[#001D4A] font-bold text-lg">You're assigned to this task!</p>
+                  <p className="text-gray-600 text-sm mt-1">Complete the work and mark it done when finished.</p>
+                </div>
+                <div className="flex gap-3">
+                  {task.conversationId && (
+                    <button onClick={() => navigate(`/messages/${task.conversationId}`)} className="inline-flex items-center bg-white border border-gray-200 hover:bg-gray-50 text-[#001D4A] font-bold py-2.5 px-5 rounded-full transition-colors text-sm shadow-sm">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                      Message Poster
+                    </button>
+                  )}
+                  <button
+                    onClick={handleMarkComplete}
+                    disabled={markingComplete}
+                    className="inline-flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-5 rounded-full transition-colors text-sm shadow-md disabled:opacity-50"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    {markingComplete ? 'Submitting...' : 'Mark as Complete'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Completed Pending Banner (tasker view) */}
+          {isAssignedTasker && task.status === 'completed_pending' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
+              <p className="text-amber-800 font-bold text-lg">⏳ Awaiting poster review</p>
+              <p className="text-amber-700 text-sm mt-1">You've marked this task as complete. Waiting for the poster to confirm and release payment.</p>
+            </div>
+          )}
+
+          {/* Completed Banner */}
+          {task.status === 'completed' && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-6">
+              <p className="text-green-800 font-bold text-lg">🎉 Task completed!</p>
+              <p className="text-green-700 text-sm mt-1">This task has been completed and payment has been released.</p>
+            </div>
+          )}
 
           <h1 className="text-4xl font-bold text-gray-900 mb-4">{task.title}</h1>
           <Link to="/tasks" className="text-blue-600 hover:underline flex items-center text-sm mb-8 font-medium">
@@ -182,17 +217,17 @@ const TaskDetail = ({ taskId }) => {
           {/* Task Info List */}
           <div className="space-y-6 mb-8">
             <div className="flex items-start">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-4 text-blue-500 overflow-hidden shrink-0 mt-1">
+              <Link to={task.user ? `/profile/${task.user._id}` : '#'} className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-4 text-blue-500 overflow-hidden shrink-0 mt-1 hover:ring-2 hover:ring-blue-300 transition">
                 {task.user && task.user.avatar ? (
                    <img src={task.user.avatar} alt={task.user.firstName} className="w-full h-full object-cover" />
                 ) : (
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
                 )}
-              </div>
+              </Link>
               <div className="flex-1 border-b border-gray-100 pb-6 flex justify-between items-start">
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Posted by</p>
-                  <p className="text-gray-900 font-medium">{task.user ? `${task.user.firstName} ${task.user.lastName ? task.user.lastName.charAt(0) + '.' : ''}` : 'Unknown'}</p>
+                  <Link to={task.user ? `/profile/${task.user._id}` : '#'} className="text-gray-900 font-medium hover:text-[#0047fb] transition">{task.user ? `${task.user.firstName} ${task.user.lastName ? task.user.lastName.charAt(0) + '.' : ''}` : 'Unknown'}</Link>
                 </div>
                 <span className="text-sm text-gray-500">{timeAgo}</span>
               </div>
@@ -264,6 +299,7 @@ const TaskDetail = ({ taskId }) => {
                       <div key={offer._id} className="pb-6 border-b border-gray-100 last:border-0">
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex items-center">
+                            <Link to={`/profile/${offer.user._id}`} className="hover:ring-2 hover:ring-blue-300 rounded-full transition">
                             {offer.user.avatar ? (
                               <img src={offer.user.avatar} alt={offer.user.firstName} className="w-12 h-12 rounded-full mr-3 object-cover" />
                             ) : (
@@ -271,9 +307,10 @@ const TaskDetail = ({ taskId }) => {
                                 <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
                               </div>
                             )}
+                            </Link>
                             <div>
                               <h4 className="font-bold text-gray-900 flex items-center gap-2">
-                                {offer.user.firstName}
+                                <Link to={`/profile/${offer.user._id}`} className="hover:text-[#0047fb] transition">{offer.user.firstName}</Link>
                                 {offer.user.rating && (
                                   <span className="text-xs font-normal text-gray-600 flex items-center">
                                     {offer.user.rating} <span className="text-orange-500 mx-1">★</span>
@@ -286,7 +323,7 @@ const TaskDetail = ({ taskId }) => {
                           {/* Offer Price display based on privacy rules */}
                           <div className="text-right">
                              {canSeePrice ? (
-                                <div className="font-bold text-[#001D4A] text-lg">${offer.price}</div>
+                                <div className="font-bold text-[#001D4A] text-lg">₹{offer.price}</div>
                              ) : (
                                 <div className="text-sm font-medium text-gray-400 bg-gray-100 px-3 py-1 rounded-full">Price Hidden</div>
                              )}
@@ -359,16 +396,16 @@ const TaskDetail = ({ taskId }) => {
                 <div className="mt-8 space-y-6">
                   {task.questions && task.questions.map(q => (
                      <div key={q._id} className="flex gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0 overflow-hidden mt-1">
+                        <Link to={q.user ? `/profile/${q.user._id}` : '#'} className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0 overflow-hidden mt-1 hover:ring-2 hover:ring-blue-300 transition">
                           {q.user && q.user.avatar ? (
                             <img src={q.user.avatar} alt={q.user.firstName} className="w-full h-full object-cover" />
                           ) : (
                             <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
                           )}
-                        </div>
+                        </Link>
                         <div>
                            <div className="flex items-baseline gap-2 mb-1">
-                             <span className="font-bold text-gray-900">{q.user ? q.user.firstName : 'Unknown'}</span>
+                             <Link to={q.user ? `/profile/${q.user._id}` : '#'} className="font-bold text-gray-900 hover:text-[#0047fb] transition">{q.user ? q.user.firstName : 'Unknown'}</Link>
                              <span className="text-xs text-gray-500">{new Date(q.createdAt).toLocaleDateString()}</span>
                            </div>
                            <p className="text-gray-800 text-sm whitespace-pre-wrap">{q.message}</p>
@@ -406,15 +443,48 @@ const TaskDetail = ({ taskId }) => {
         <div className="w-full lg:w-[320px] shrink-0">
           <div className="bg-[#F5F7FB] rounded-xl p-6 mb-4 sticky top-6">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide text-center mb-1">Task Budget</p>
-            <p className="text-5xl font-extrabold text-[#001D4A] text-center mb-6">${task.budget}</p>
+            <p className="text-5xl font-extrabold text-[#001D4A] text-center mb-6">₹{task.budget}</p>
             
-            {currentUserId !== task.user._id && (
+            {/* Show Make an Offer only when task is open and user is not the owner */}
+            {task.status === 'open' && currentUserId !== task.user._id && (
                 <button 
-                    onClick={() => setShowOfferModal(true)}
+                    onClick={() => {
+                        if (existingOffer) {
+                            setOfferPrice(String(existingOffer.price));
+                            setOfferMessage(existingOffer.message);
+                        }
+                        setShowOfferModal(true);
+                    }}
                     className="w-full bg-[#0057FF] hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-full transition-colors mb-6 shadow-md"
                 >
-                    Make an offer
+                    {existingOffer ? 'Update your offer' : 'Make an offer'}
                 </button>
+            )}
+
+            {/* Assigned tasker info when task is not open */}
+            {task.status !== 'open' && isAssignedTasker && (
+                <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200">
+                    <p className="text-xs font-bold text-gray-500 uppercase mb-2">Status</p>
+                    <p className="text-sm font-bold text-[#001D4A]">
+                        {task.status === 'assigned' && '🔧 In Progress'}
+                        {task.status === 'completed_pending' && '⏳ Awaiting Review'}
+                        {task.status === 'completed' && '✅ Completed'}
+                    </p>
+                    {task.acceptedOffer?.price && (
+                        <p className="text-sm text-gray-600 mt-2">Accepted price: <span className="font-bold text-[#001D4A]">₹{task.acceptedOffer.price}</span></p>
+                    )}
+                </div>
+            )}
+
+            {task.status !== 'open' && !isAssignedTasker && (
+                <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200">
+                    <p className="text-xs font-bold text-gray-500 uppercase mb-2">Task Status</p>
+                    <p className="text-sm font-bold text-[#001D4A]">
+                        {task.status === 'assigned' && 'Assigned to a Tasker'}
+                        {task.status === 'completed_pending' && 'Under Review'}
+                        {task.status === 'completed' && 'Completed'}
+                    </p>
+                </div>
             )}
             
             <div className="relative">
@@ -438,7 +508,7 @@ const TaskDetail = ({ taskId }) => {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-fade-in flex flex-col max-h-[90vh]">
                   <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                      <h2 className="text-2xl font-bold text-[#071343]">Make an offer</h2>
+                      <h2 className="text-2xl font-bold text-[#071343]">{existingOffer ? 'Update your offer' : 'Make an offer'}</h2>
                       <button onClick={() => setShowOfferModal(false)} className="text-gray-400 hover:text-gray-700 transition">
                           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
@@ -458,7 +528,7 @@ const TaskDetail = ({ taskId }) => {
                               </label>
                               <div className="relative">
                                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                      <span className="text-[#071343] font-medium text-lg">$</span>
+                                      <span className="text-[#071343] font-medium text-lg">₹</span>
                                   </div>
                                   <input
                                       type="number"
@@ -470,7 +540,7 @@ const TaskDetail = ({ taskId }) => {
                                       max={task.budget - 1} // Front-end validation to be less than budget
                                   />
                               </div>
-                              <p className="text-xs text-gray-500 mt-2">Must be less than the original budget (${task.budget}). Only the task owner will see this amount.</p>
+                              <p className="text-xs text-gray-500 mt-2">Must be less than the original budget (₹{task.budget}). Only the task owner will see this amount.</p>
                           </div>
 
                           <div className="mb-4">
@@ -506,8 +576,8 @@ const TaskDetail = ({ taskId }) => {
                           className="px-8 py-2.5 bg-[#0057FF] hover:bg-blue-700 text-white rounded-full font-bold transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                       >
                           {offerLoading ? (
-                              <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span> Submitting...</>
-                          ) : 'Submit Offer'}
+                              <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span> {existingOffer ? 'Updating...' : 'Submitting...'}</>
+                          ) : (existingOffer ? 'Update Offer' : 'Submit Offer')}
                       </button>
                   </div>
               </div>

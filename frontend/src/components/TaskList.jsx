@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import axiosInstance from '../api/axios';
 import TaskCard from './TaskCard';
 
 const TaskList = () => {
@@ -12,14 +13,10 @@ const TaskList = () => {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await fetch('/api/tasks');
-        if (!response.ok) {
-          throw new Error('Failed to fetch tasks');
-        }
-        const data = await response.json();
+        const { data } = await axiosInstance.get('/tasks');
         setTasks(data);
       } catch (err) {
-        setError(err.message);
+        setError(err.response?.data?.message || 'Failed to fetch tasks');
       } finally {
         setIsLoading(false);
       }

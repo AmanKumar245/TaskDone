@@ -57,13 +57,50 @@ const userSchema = new mongoose.Schema(
         feedbacks: [{
             rating: { type: Number, required: true },
             comment: { type: String },
+            task: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Task',
+            },
             reviewer: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'User',
                 required: true
             },
             createdAt: { type: Date, default: Date.now }
-        }]
+        }],
+        about: {
+            type: String,
+            default: ''
+        },
+        location: {
+            type: String,
+            default: ''
+        },
+        education: [{
+            type: String
+        }],
+        workExperience: [{
+            type: String
+        }],
+        portfolio: [{
+            type: String // Cloudinary URLs
+        }],
+        completionRate: {
+            type: Number,
+            default: 0
+        },
+        tasksCompleted: {
+            type: Number,
+            default: 0
+        },
+        lastOnline: {
+            type: Date,
+            default: Date.now
+        },
+        isVerified: {
+            type: Boolean,
+            default: false
+        }
     },
     {
         timestamps: true,
@@ -76,9 +113,9 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 };
 
 // Hook to hash password before saving
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function () {
     if (!this.isModified('password')) {
-        next();
+        return;
     }
 
     const salt = await bcrypt.genSalt(10);

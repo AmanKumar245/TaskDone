@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import axiosInstance from '../api/axios';
+import { setCredentials } from '../store/authSlice';
 
 const Signup = () => {
     const [step, setStep] = useState(1);
@@ -18,6 +21,7 @@ const Signup = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const dispatch = useDispatch();
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -41,35 +45,23 @@ const Signup = () => {
         setError(null);
 
         try {
-            const response = await fetch('/api/users', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData),
-            });
+            const { data } = await axiosInstance.post('/users', formData);
 
-            const data = await response.json();
-
-            if (response.ok) {
-                // Save token to localStorage
-                localStorage.setItem('token', data.token);
-                // Save user info
-                localStorage.setItem('userInfo', JSON.stringify({
+            dispatch(setCredentials({
+                userInfo: {
                     _id: data._id,
                     firstName: data.firstName,
                     lastName: data.lastName,
                     email: data.email,
-                    role: data.role
-                }));
-                
-                // Redirect to homepage or dashboard
-                navigate('/');
-            } else {
-                setError(data.message || 'Signup failed. Please try again.');
-            }
+                    role: data.role,
+                    avatar: data.avatar,
+                },
+                token: data.token,
+            }));
+
+            navigate('/');
         } catch (err) {
-            setError('Network error. Please check your connection.');
+            setError(err.response?.data?.message || 'Network error. Please check your connection.');
         } finally {
             setIsLoading(false);
         }
@@ -320,7 +312,7 @@ const Signup = () => {
                             onClick={() => setFormData({...formData, goal: 'earn_money'})}
                             className={`flex-1 flex flex-col items-center justify-center py-6 rounded-lg border-2 transition-all ${formData.goal === 'earn_money' ? 'bg-[#071343] border-[#071343] text-white' : 'bg-[#f4f5f8] border-transparent text-[#071343] hover:border-[#071343]'}`}
                         >
-                            <div className="text-2xl mb-2 font-medium">$</div>
+                            <div className="text-2xl mb-2 font-medium">₹</div>
                             <span className="font-bold">Earn money</span>
                         </button>
                     </div>
@@ -392,8 +384,8 @@ const Signup = () => {
             <div className="flex-grow flex flex-col overflow-y-auto overflow-x-hidden">
 
                 {/* Minimal Header */}
-                <header className="p-6">
-                    <Link to="/" className="text-[#0047fb] font-black text-3xl tracking-tighter inline-block">
+                <header className="p-6 relative z-20">
+                    <Link to="/" className="text-[#0047fb] font-black text-3xl tracking-tighter inline-block cursor-pointer">
                         TaskDone
                     </Link>
                 </header>

@@ -9,12 +9,12 @@ const tabs = [
 ];
 
 const mockTasks = [
-    { id: 1, category: 'DELIVERY', title: 'Sofa delivery', userAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=50&h=50&fit=crop', price: '$95', rating: '5 Stars' },
-    { id: 2, category: 'CLEANING', title: 'End of lease clean', userAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=50&h=50&fit=crop', price: '$450', rating: '5 Stars' },
-    { id: 3, category: 'REMOVALS', title: 'Couch moved 1km down the road', userAvatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=50&h=50&fit=crop', price: '$60', rating: '5 Stars' },
-    { id: 4, category: 'REMOVALS', title: 'Removalist TODAY', userAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=50&h=50&fit=crop', price: '$506', rating: '5 Stars' },
-    { id: 5, category: 'REMOVALS', title: 'Urgent removalist', userAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop', price: '$450', rating: '5 Stars' },
-    { id: 6, category: 'HANDYMAN', title: 'Fix broken door hinge', userAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=50&h=50&fit=crop', price: '$120', rating: '5 Stars' },
+    { id: 1, category: 'DELIVERY', title: 'Sofa delivery', userAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=50&h=50&fit=crop', price: '₹95', rating: '5 Stars' },
+    { id: 2, category: 'CLEANING', title: 'End of lease clean', userAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=50&h=50&fit=crop', price: '₹450', rating: '5 Stars' },
+    { id: 3, category: 'REMOVALS', title: 'Couch moved 1km down the road', userAvatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=50&h=50&fit=crop', price: '₹60', rating: '5 Stars' },
+    { id: 4, category: 'REMOVALS', title: 'Removalist TODAY', userAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=50&h=50&fit=crop', price: '₹506', rating: '5 Stars' },
+    { id: 5, category: 'REMOVALS', title: 'Urgent removalist', userAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop', price: '₹450', rating: '5 Stars' },
+    { id: 6, category: 'HANDYMAN', title: 'Fix broken door hinge', userAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=50&h=50&fit=crop', price: '₹120', rating: '5 Stars' },
 ];
 
 // Duplicate for infinite scroll

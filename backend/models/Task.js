@@ -44,10 +44,28 @@ const taskSchema = new mongoose.Schema(
             type: Number,
             required: true,
         },
+        assignedTo: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+        acceptedOffer: {
+            offerId: { type: mongoose.Schema.Types.ObjectId },
+            price: { type: Number },
+        },
+        conversationId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Conversation',
+        },
         status: {
             type: String,
-            enum: ['open', 'assigned', 'completed'],
+            enum: ['open', 'assigned', 'completed_pending', 'completed'],
             default: 'open',
+        },
+        review: {
+            rating: { type: Number },
+            comment: { type: String },
+            reviewer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            createdAt: { type: Date },
         },
         images: [{
             type: String, // URLs to images if any

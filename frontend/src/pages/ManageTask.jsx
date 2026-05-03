@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import axiosInstance from '../api/axios';
 
 const ManageTask = () => {
     const { taskId } = useParams();
@@ -15,33 +17,28 @@ const ManageTask = () => {
     const [replyMessage, setReplyMessage] = useState('');
     const [isReplying, setIsReplying] = useState(false);
 
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+    // Review state
+    const [showReviewModal, setShowReviewModal] = useState(false);
+    const [reviewRating, setReviewRating] = useState(0);
+    const [reviewComment, setReviewComment] = useState('');
+    const [reviewLoading, setReviewLoading] = useState(false);
+    const [reviewHover, setReviewHover] = useState(0);
+
+    const { userInfo } = useSelector((state) => state.auth);
 
     const fetchTask = async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                navigate('/login');
-                return;
-            }
-
-            const response = await fetch(`/api/tasks/${taskId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (!response.ok) throw new Error('Failed to fetch task details');
-            
-            const data = await response.json();
+            const { data } = await axiosInstance.get(`/tasks/${taskId}`);
             
             // Security check: Only the owner should manage this task
             if (data.user._id !== userInfo._id) {
-                navigate('/tasks'); // Redirect if not owner
+                navigate('/tasks');
                 return;
             }
 
             setTask(data);
         } catch (err) {
-            setError(err.message);
+            setError(err.response?.data?.message || 'Failed to fetch task details');
         } finally {
             setIsLoading(false);
         }
@@ -55,20 +52,34 @@ const ManageTask = () => {
         if (!window.confirm("Are you sure you want to accept this offer?")) return;
         
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/tasks/${taskId}/offers/${offerId}/accept`, {
-                method: 'PATCH',
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                fetchTask(); // Refresh to see updated status
-            } else {
-                const data = await response.json();
-                alert(data.message || "Failed to accept offer");
-            }
+            const res = await axiosInstance.patch(`/tasks/${taskId}/offers/${offerId}/accept`);
+            if (res.status === 200) fetchTask();
         } catch (err) {
-            alert("Network error occurred.");
+            alert(err.response?.data?.message || "Failed to accept offer");
+        }
+    };
+
+    const handleReleasePayment = async () => {
+        if (!window.confirm("Confirm that the work is complete and release payment?")) return;
+        try {
+            await axiosInstance.patch(`/tasks/${taskId}/release-payment`);
+            fetchTask();
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to release payment");
+        }
+    };
+
+    const handleSubmitReview = async () => {
+        if (reviewRating === 0) return;
+        setReviewLoading(true);
+        try {
+            await axiosInstance.post(`/tasks/${taskId}/review`, { rating: reviewRating, comment: reviewComment });
+            setShowReviewModal(false);
+            fetchTask();
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to submit review');
+        } finally {
+            setReviewLoading(false);
         }
     };
 
@@ -77,31 +88,18 @@ const ManageTask = () => {
         setIsReplying(true);
 
         try {
-            const token = localStorage.getItem('token');
             const endpoint = type === 'offer' 
-                ? `/api/tasks/${taskId}/offers/${id}/reply`
-                : `/api/tasks/${taskId}/questions/${id}/reply`;
+                ? `/tasks/${taskId}/offers/${id}/reply`
+                : `/tasks/${taskId}/questions/${id}/reply`;
 
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}` 
-                },
-                body: JSON.stringify({ message: replyMessage })
-            });
+            await axiosInstance.post(endpoint, { message: replyMessage });
 
-            if (response.ok) {
-                setReplyMessage('');
-                setReplyingToOfferId(null);
-                setReplyingToQuestionId(null);
-                fetchTask(); // Refresh to show the new reply
-            } else {
-                const data = await response.json();
-                alert(data.message || "Failed to submit reply");
-            }
+            setReplyMessage('');
+            setReplyingToOfferId(null);
+            setReplyingToQuestionId(null);
+            fetchTask();
         } catch (err) {
-            alert("Network error occurred.");
+            alert(err.response?.data?.message || "Failed to submit reply");
         } finally {
             setIsReplying(false);
         }
@@ -130,23 +128,66 @@ const ManageTask = () => {
     const offerCount = task.offers ? task.offers.length : 0;
     const questionCount = task.questions ? task.questions.length : 0;
 
+    const isAssigned = task.status === 'assigned' || task.status === 'completed_pending' || task.status === 'completed';
+    const assignedUser = task.assignedTo;
+
     return (
         <div className="bg-gray-50 min-h-[calc(100vh-80px)] font-sans">
+            {/* Assigned Banner */}
+            {isAssigned && (
+                <div className={`px-6 py-4 text-center text-white font-bold text-sm ${
+                    task.status === 'completed' ? 'bg-green-600' :
+                    task.status === 'completed_pending' ? 'bg-amber-500' :
+                    'bg-[#0047fb]'
+                }`}>
+                    {task.status === 'assigned' && '✅ Task assigned — work in progress'}
+                    {task.status === 'completed_pending' && '⏳ Tasker marked work as done — review and release payment'}
+                    {task.status === 'completed' && '🎉 Task completed — payment released!'}
+                </div>
+            )}
+
             {/* Top Section */}
             <div className="bg-[#FAF9F5] py-12 px-6">
                 <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8 justify-between items-start">
                     <div className="flex-1">
-                        {offerCount > 0 && <p className="text-[#0047fb] font-bold text-sm mb-2 flex items-center"><span className="w-2 h-2 rounded-full bg-[#0047fb] mr-2"></span> New offers!</p>}
+                        {task.status === 'open' && offerCount > 0 && <p className="text-[#0047fb] font-bold text-sm mb-2 flex items-center"><span className="w-2 h-2 rounded-full bg-[#0047fb] mr-2"></span> New offers!</p>}
                         <h1 className="text-5xl font-extrabold text-[#001D4A] mb-4">
-                            {offerCount === 0 ? "No offers yet" : `You have ${offerCount} offer${offerCount > 1 ? 's' : ''}`}
+                            {task.status === 'open' && (offerCount === 0 ? "No offers yet" : `You have ${offerCount} offer${offerCount > 1 ? 's' : ''}`)}
+                            {task.status === 'assigned' && 'Task in progress'}
+                            {task.status === 'completed_pending' && 'Work submitted'}
+                            {task.status === 'completed' && 'Task completed!'}
                         </h1>
                         <p className="text-gray-600 text-lg mb-6">
-                            Discuss details with Taskers and accept an offer when you're ready.
+                            {task.status === 'open' && "Discuss details with Taskers and accept an offer when you're ready."}
+                            {task.status === 'assigned' && `${assignedUser?.firstName || 'Tasker'} is working on your task.`}
+                            {task.status === 'completed_pending' && `${assignedUser?.firstName || 'Tasker'} has marked the work as done. Review and release payment.`}
+                            {task.status === 'completed' && 'This task has been completed and payment has been released.'}
                         </p>
-                        <p className="text-gray-500 text-sm flex items-center">
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            181 views
-                        </p>
+
+                        {/* Action buttons for assigned tasks */}
+                        {isAssigned && (
+                            <div className="flex flex-wrap gap-3 mb-4">
+                                {task.conversationId && (
+                                    <Link to={`/messages/${task.conversationId}`} className="inline-flex items-center bg-[#0047fb] hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full transition-colors shadow-md text-sm">
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                        Message Tasker
+                                    </Link>
+                                )}
+                                {task.status === 'completed_pending' && (
+                                    <button onClick={handleReleasePayment} className="inline-flex items-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full transition-colors shadow-md text-sm">
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        Release Payment (₹{task.acceptedOffer?.price})
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {task.status === 'open' && (
+                            <p className="text-gray-500 text-sm flex items-center">
+                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                181 views
+                            </p>
+                        )}
                     </div>
 
                     {/* Task Summary Card */}
@@ -175,7 +216,7 @@ const ManageTask = () => {
                                 <svg className="w-5 h-5 text-gray-400 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 <div className="flex-1">
                                     <p className="text-xs text-gray-500 font-semibold uppercase">Price</p>
-                                    <p className="text-[#001D4A] font-bold text-sm">${task.budget}</p>
+                                    <p className="text-[#001D4A] font-bold text-sm">₹{task.budget}</p>
                                 </div>
                                 <button className="text-[#0047fb] text-sm font-semibold">Edit</button>
                             </div>
@@ -229,6 +270,7 @@ const ManageTask = () => {
 
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex items-center">
+                                            <Link to={offer.user ? `/profile/${offer.user._id}` : '#'} className="hover:ring-2 hover:ring-blue-300 rounded-full transition">
                                             {offer.user?.avatar ? (
                                                 <img src={offer.user.avatar} alt={offer.user.firstName} className="w-16 h-16 rounded-full mr-4 object-cover border border-gray-100 shadow-sm" />
                                             ) : (
@@ -236,14 +278,17 @@ const ManageTask = () => {
                                                     <span className="text-xl font-bold">{offer.user?.firstName?.charAt(0)}</span>
                                                 </div>
                                             )}
+                                            </Link>
                                             <div>
                                                 <h4 className="font-bold text-[#001D4A] text-lg leading-tight flex items-center">
-                                                    {offer.user?.firstName} {offer.user?.lastName?.charAt(0)}.
+                                                    <Link to={offer.user ? `/profile/${offer.user._id}` : '#'} className="hover:text-[#0047fb] transition">
+                                                        {offer.user?.firstName} {offer.user?.lastName?.charAt(0)}.
+                                                    </Link>
                                                 </h4>
                                                 <span className="text-xs font-bold text-[#0047fb]">New!</span>
                                             </div>
                                         </div>
-                                        <div className="font-extrabold text-[#001D4A] text-2xl">${offer.price}</div>
+                                        <div className="font-extrabold text-[#001D4A] text-2xl">₹{offer.price}</div>
                                     </div>
 
                                     <div className="bg-[#f3f6ff] p-4 rounded-lg text-gray-800 text-sm mb-4 whitespace-pre-wrap lg:mr-40">
@@ -311,6 +356,7 @@ const ManageTask = () => {
                             task.questions.map((q) => (
                                 <div key={q._id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                                     <div className="flex items-center mb-3">
+                                        <Link to={q.user ? `/profile/${q.user._id}` : '#'} className="hover:ring-2 hover:ring-blue-300 rounded-full transition">
                                         {q.user?.avatar ? (
                                             <img src={q.user.avatar} alt={q.user.firstName} className="w-10 h-10 rounded-full mr-3 object-cover border border-gray-100" />
                                         ) : (
@@ -318,11 +364,14 @@ const ManageTask = () => {
                                                 {q.user?.firstName?.charAt(0)}
                                             </div>
                                         )}
+                                        </Link>
                                         <div>
-                                            <div className="font-bold text-[#001D4A] text-sm">
+                                            <Link to={q.user ? `/profile/${q.user._id}` : '#'} className="font-bold text-[#001D4A] text-sm hover:text-[#0047fb] transition">
                                                 {q.user?.firstName} {q.user?.lastName?.charAt(0)}.
+                                            </Link>
+                                            <div>
+                                                <span className="text-xs text-gray-500">{new Date(q.createdAt).toLocaleDateString()}</span>
                                             </div>
-                                            <span className="text-xs text-gray-500">{new Date(q.createdAt).toLocaleDateString()}</span>
                                         </div>
                                     </div>
 
@@ -378,6 +427,86 @@ const ManageTask = () => {
                     </div>
                 )}
             </div>
+
+            {/* Review Section — after task completion */}
+            {task.status === 'completed' && (
+                <div className="max-w-6xl mx-auto px-6 pb-12">
+                    {task.review && task.review.rating ? (
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                            <h3 className="font-bold text-[#001D4A] text-lg mb-4">Your Review</h3>
+                            <div className="flex items-center gap-1 mb-2">
+                                {[1,2,3,4,5].map(s => (
+                                    <span key={s} style={{ color: s <= task.review.rating ? '#f59e0b' : '#d1d5db', fontSize: '24px' }}>★</span>
+                                ))}
+                                <span className="text-gray-500 text-sm ml-2">{task.review.rating}/5</span>
+                            </div>
+                            {task.review.comment && <p className="text-gray-700 text-sm">{task.review.comment}</p>}
+                        </div>
+                    ) : (
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-6 flex items-center justify-between flex-wrap gap-4">
+                            <div>
+                                <h3 className="font-bold text-[#001D4A] text-lg">How was your experience?</h3>
+                                <p className="text-gray-600 text-sm mt-1">Leave a review for your tasker to help the community.</p>
+                            </div>
+                            <button
+                                onClick={() => setShowReviewModal(true)}
+                                className="bg-[#0047fb] hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full transition-colors shadow-md text-sm"
+                            >
+                                Leave a Review
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Review Modal */}
+            {showReviewModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-[#001D4A]">Rate your Tasker</h2>
+                            <button onClick={() => setShowReviewModal(false)} className="text-gray-400 hover:text-gray-700">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <div className="flex justify-center gap-2 mb-6">
+                                {[1,2,3,4,5].map(star => (
+                                    <button
+                                        key={star}
+                                        onMouseEnter={() => setReviewHover(star)}
+                                        onMouseLeave={() => setReviewHover(0)}
+                                        onClick={() => setReviewRating(star)}
+                                        style={{
+                                            background: 'none', border: 'none', cursor: 'pointer',
+                                            fontSize: '40px', transition: 'transform 0.15s',
+                                            color: star <= (reviewHover || reviewRating) ? '#f59e0b' : '#d1d5db',
+                                            transform: star <= (reviewHover || reviewRating) ? 'scale(1.15)' : 'scale(1)',
+                                        }}
+                                    >★</button>
+                                ))}
+                            </div>
+                            <textarea
+                                placeholder="Write a comment (optional)"
+                                rows={4}
+                                className="w-full bg-[#f3f6ff] border-2 border-transparent focus:border-[#0047fb] rounded-xl p-4 text-gray-900 focus:outline-none transition resize-none"
+                                value={reviewComment}
+                                onChange={(e) => setReviewComment(e.target.value)}
+                            />
+                        </div>
+                        <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                            <button onClick={() => setShowReviewModal(false)} className="px-6 py-2.5 rounded-full font-bold text-gray-600 hover:bg-gray-200 transition">Cancel</button>
+                            <button
+                                onClick={handleSubmitReview}
+                                disabled={reviewLoading || reviewRating === 0}
+                                className="px-8 py-2.5 bg-[#0057FF] hover:bg-blue-700 text-white rounded-full font-bold transition shadow-md disabled:opacity-50"
+                            >
+                                {reviewLoading ? 'Submitting...' : 'Submit Review'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

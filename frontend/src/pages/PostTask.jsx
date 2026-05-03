@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import axiosInstance from '../api/axios';
 
 // Custom Date Picker component to perfectly match Airtasker's UI
 const CustomDatePicker = ({ selectedDate, onSelectDate, onClose }) => {
@@ -112,6 +114,14 @@ const PostTask = () => {
     const navigate = useNavigate();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const { token } = useSelector((state) => state.auth);
+
+    // Redirect to login if user is not authenticated
+    useEffect(() => {
+        if (!token) {
+            navigate('/login');
+        }
+    }, [navigate, token]);
     
     // Step 1: Title & Date
     const [title, setTitle] = useState('');
@@ -200,13 +210,8 @@ const PostTask = () => {
         setError(null);
 
         try {
-            const token = localStorage.getItem('token');
-            
             if (!token) {
-                setError('You must be logged in to post a task.');
-                setIsLoading(false);
-                // Optionally redirect to login here
-                // navigate('/login');
+                navigate('/login');
                 return;
             }
 
@@ -222,25 +227,10 @@ const PostTask = () => {
                 budget: Number(budget)
             };
 
-            const response = await fetch('/api/tasks', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify(taskData)
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                // Success - redirect to homepage or task detail
-                navigate('/');
-            } else {
-                setError(data.message || 'Failed to post task');
-            }
+            await axiosInstance.post('/tasks', taskData);
+            navigate('/');
         } catch (err) {
-            setError('Network error. Please try again.');
+            setError(err.response?.data?.message || 'Network error. Please try again.');
         } finally {
             setIsLoading(false);
         }
@@ -623,7 +613,7 @@ const PostTask = () => {
                                     </p>
                                     <div className="relative max-w-sm">
                                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <span className="text-[#071343] font-medium text-lg">$</span>
+                                            <span className="text-[#071343] font-medium text-lg">₹</span>
                                         </div>
                                         <input
                                             type="number"

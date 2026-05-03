@@ -82,7 +82,7 @@ const BeYourOwnBoss = () => {
                                     <div className="font-bold text-sm">Paint chairs</div>
                                     <div className="text-xs text-gray-400">2h ago</div>
                                 </div>
-                                <div className="text-xl font-black text-[#071343]">$179</div>
+                                <div className="text-xl font-black text-[#071343]">₹179</div>
                             </div>
                         </div>
 
@@ -100,7 +100,7 @@ const BeYourOwnBoss = () => {
                                     <path d="M0 20 Q 15 25, 30 15 T 60 20 T 100 5" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" />
                                 </svg>
                             </div>
-                            <div className="font-black text-2xl text-[#071343] tracking-tighter">$13,066</div>
+                            <div className="font-black text-2xl text-[#071343] tracking-tighter">₹13,066</div>
                             <div className="text-xs font-bold text-green-500 mt-1">↑ 25% vs last month</div>
                         </div>
 

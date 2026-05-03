@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import axiosInstance from '../api/axios';
+import { setCredentials } from '../store/authSlice';
 
 const Login = () => {
     const [step, setStep] = useState(1);
@@ -9,6 +12,7 @@ const Login = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const dispatch = useDispatch();
 
     const handleContinueToStep2 = () => {
         if (email) {
@@ -23,35 +27,23 @@ const Login = () => {
         setError(null);
 
         try {
-            const response = await fetch('/api/users/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email, password }),
-            });
+            const { data } = await axiosInstance.post('/users/login', { email, password });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                // Save token to localStorage
-                localStorage.setItem('token', data.token);
-                // Save user info
-                localStorage.setItem('userInfo', JSON.stringify({
+            dispatch(setCredentials({
+                userInfo: {
                     _id: data._id,
                     firstName: data.firstName,
                     lastName: data.lastName,
                     email: data.email,
-                    role: data.role
-                }));
-                
-                // Redirect to homepage
-                navigate('/');
-            } else {
-                setError(data.message || 'Invalid email or password');
-            }
+                    role: data.role,
+                    avatar: data.avatar,
+                },
+                token: data.token,
+            }));
+
+            navigate('/');
         } catch (err) {
-            setError('Network error. Please check your connection.');
+            setError(err.response?.data?.message || 'Network error. Please check your connection.');
         } finally {
             setIsLoading(false);
         }
@@ -59,11 +51,11 @@ const Login = () => {
 
     // Icons inline SVG
     const EyeIcon = () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
     );
 
     const EyeOffIcon = () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" /></svg>
     );
 
     const renderStep1 = () => (
@@ -96,8 +88,8 @@ const Login = () => {
                     <span className="text-sm">Verify you are human</span>
                 </div>
 
-                <button 
-                    type="button" 
+                <button
+                    type="button"
                     onClick={handleContinueToStep2}
                     disabled={!email}
                     className="w-full bg-[#0047fb] text-white py-3.5 rounded-full font-bold text-lg hover:bg-blue-700 transition mt-2 disabled:bg-blue-300 disabled:cursor-not-allowed"
@@ -133,13 +125,13 @@ const Login = () => {
             <h1 className="text-[32px] font-black text-[#071343] tracking-tighter mb-8 text-center leading-tight">
                 Login to your account
             </h1>
-            
+
             <div className="flex flex-col gap-6">
                 {/* Email Display with Edit Button */}
                 <div className="flex justify-between items-center px-1">
                     <span className="text-[#071343] font-medium text-[16px]">{email}</span>
-                    <button 
-                        type="button" 
+                    <button
+                        type="button"
                         onClick={() => setStep(1)}
                         className="text-[#0047fb] font-bold text-[15px] hover:underline"
                     >
@@ -164,8 +156,8 @@ const Login = () => {
                     >
                         Password*
                     </label>
-                    <button 
-                        type="button" 
+                    <button
+                        type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-[#071343] transition-colors"
                     >
@@ -188,8 +180,8 @@ const Login = () => {
                 )}
 
                 {/* Submit Button */}
-                <button 
-                    type="button" 
+                <button
+                    type="button"
                     onClick={handleLogin}
                     disabled={!password || isLoading}
                     className="w-full bg-[#0047fb] text-white py-3.5 rounded-full font-bold text-lg hover:bg-blue-700 transition disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
@@ -214,8 +206,8 @@ const Login = () => {
             <div className="flex-grow flex flex-col overflow-y-auto overflow-x-hidden">
 
                 {/* Minimal Header */}
-                <header className="p-6">
-                    <Link to="/" className="text-[#0047fb] font-black text-3xl tracking-tighter inline-block">
+                <header className="p-6 relative z-20">
+                    <Link to="/" className="text-[#0047fb] font-black text-3xl tracking-tighter inline-block cursor-pointer">
                         TaskDone
                     </Link>
                 </header>

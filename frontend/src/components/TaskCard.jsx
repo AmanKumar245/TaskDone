@@ -8,7 +8,7 @@ const TaskCard = ({ title, price, location, schedule, status, offers, avatar, on
     >
       <div className="flex justify-between items-start mb-2">
         <h3 className="font-semibold text-gray-900 text-lg pr-4">{title}</h3>
-        <span className="font-bold text-gray-900 text-xl">${price}</span>
+        <span className="font-bold text-gray-900 text-xl">₹{price}</span>
       </div>
       
       <div className="flex items-center text-gray-500 text-sm mb-1">

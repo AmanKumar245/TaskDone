@@ -22,7 +22,7 @@ const Membership = () => {
                     </div>
 
                     <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#071343] leading-[1.05] tracking-tighter mb-8">
-                        Unlock $0 Connection Fees<br className="hidden md:block" /> all year round.
+                        Unlock ₹0 Connection Fees<br className="hidden md:block" /> all year round.
                     </h2>
 
                     <div className="mb-4">
@@ -32,7 +32,7 @@ const Membership = () => {
                     </div>
 
                     <p className="text-sm text-[#071343] font-semibold">
-                        Membership $89/yr. <a href="#" className="underline hover:text-[#0047fb]">T&Cs apply</a>.
+                        Membership ₹89/yr. <a href="#" className="underline hover:text-[#0047fb]">T&Cs apply</a>.
                     </p>
                 </div>
 
