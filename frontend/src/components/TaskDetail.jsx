@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
 
@@ -26,7 +26,7 @@ const TaskDetail = ({ taskId }) => {
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || 'null');
   const currentUserId = userInfo ? userInfo._id : null;
 
-  const fetchTask = async () => {
+  const fetchTask = useCallback(async () => {
     if (!taskId) return;
     
     setIsLoading(true);
@@ -40,11 +40,11 @@ const TaskDetail = ({ taskId }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [taskId]);
 
   useEffect(() => {
     fetchTask();
-  }, [taskId]);
+  }, [fetchTask]);
 
   const submitOffer = async (e) => {
     e.preventDefault();
@@ -127,7 +127,6 @@ const TaskDetail = ({ taskId }) => {
 
   // Check if current user is the assigned tasker
   const isAssignedTasker = task.assignedTo && currentUserId === (task.assignedTo._id || task.assignedTo);
-  const isTaskOwner = currentUserId === task.user._id;
 
   // Check if current user already has an offer
   const existingOffer = task.offers?.find(o => o.user._id === currentUserId || o.user === currentUserId);

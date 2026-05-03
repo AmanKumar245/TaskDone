@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import axiosInstance from '../api/axios';
@@ -26,7 +26,7 @@ const ManageTask = () => {
 
     const { userInfo } = useSelector((state) => state.auth);
 
-    const fetchTask = async () => {
+    const fetchTask = useCallback(async () => {
         try {
             const { data } = await axiosInstance.get(`/tasks/${taskId}`);
             
@@ -42,11 +42,11 @@ const ManageTask = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [taskId, navigate, userInfo?._id]);
 
     useEffect(() => {
         fetchTask();
-    }, [taskId, navigate, userInfo?._id]);
+    }, [fetchTask]);
 
     const handleAcceptOffer = async (offerId) => {
         if (!window.confirm("Are you sure you want to accept this offer?")) return;
